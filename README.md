@@ -1,66 +1,104 @@
 # CLIProxyAPI Updater
 
-A lightweight Windows updater and management toolkit for [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
+This repository contains two release-based updater scripts for [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI):
 
-This project provides simple PowerShell and Python utilities to keep CLIProxyAPI up to date with the latest GitHub release.
+* `update_cliproxyapi.ps1` for PowerShell
+* `update_cliproxyapi.py` for Python
 
-The main goal is to make CLIProxyAPI maintenance on Windows simple and predictable without requiring users to manually check releases, download archives, replace binaries, or manage Python environments.
+Both scripts fetch the matching GitHub release asset for the current OS/architecture, compare it with the locally installed version, and install or upgrade the package in place.
 
-## Features
+## What the scripts actually do
 
-* Check the latest CLIProxyAPI release from GitHub
-* Compare the latest release with the locally installed version
-* Automatically download the appropriate Windows release
-* Update the CLIProxyAPI executable while preserving existing configuration
-* Stop and restart CLIProxyAPI during updates when needed
-* Skip updates when the installed version is already current
-* PowerShell-based Windows automation
-* Python utilities managed with [`uv`](https://github.com/astral-sh/uv)
-* Designed to stay lightweight, transparent, and easy to modify
+* Query the latest release, or a specific tag such as `v6.8.35`
+* Detect the local installed version by running `cli-proxy-api --help`
+* Match the right release asset for `windows`, `linux`, or `darwin` and `amd64`/`arm64`
+* Validate the asset exists in the release
+* Download and extract the package
+* Replace the installation directory with the new release contents
+* Rename `config.example.yaml` to `config.yaml` during a full install
+* Back up an existing `config.yaml` to a timestamped file in the temp directory before replacement
+* Verify the installed version matches the requested release
+* Support optional GitHub token authentication
 
-## Goals
+## Supported options
 
-This project focuses on a few simple principles:
+### PowerShell
 
-* **Windows-first** — built specifically around PowerShell and common Windows workflows
-* **Minimal setup** — avoid unnecessary services or complex installation steps
-* **Safe updates** — preserve configuration and user data whenever possible
-* **Simple tooling** — small scripts that are easy to understand and customize
-* **Low maintenance** — reduce the manual work required to keep CLIProxyAPI current
+```powershell
+./update_cliproxyapi.ps1
+./update_cliproxyapi.ps1 -CheckOnly
+./update_cliproxyapi.ps1 -DryRun
+./update_cliproxyapi.ps1 -TargetVersion v6.8.35
+./update_cliproxyapi.ps1 -Force
+./update_cliproxyapi.ps1 -AllowDowngrade
+./update_cliproxyapi.ps1 -KeepTemp
+./update_cliproxyapi.ps1 -GitHubToken "github_pat_xxx"
+./update_cliproxyapi.ps1 -InstallDir "C:\Tools\CLIProxyAPI"
+```
 
-## Scope
+Token priority:
 
-This repository is not intended to replace CLIProxyAPI itself or provide a full management interface.
+1. `-GitHubToken`
+2. `$env:GITHUB_TOKEN`
+3. `$env:GH_TOKEN`
 
-Its purpose is primarily to provide lightweight tooling around:
+### Python
 
-* Release checking
-* Version comparison
-* Binary updates
-* Process management
-* Update automation
-* Supporting utilities
+```bash
+python update_cliproxyapi.py
+python update_cliproxyapi.py --check-only
+python update_cliproxyapi.py --dry-run
+python update_cliproxyapi.py --target-version v6.8.35
+python update_cliproxyapi.py --force
+python update_cliproxyapi.py --allow-downgrade
+python update_cliproxyapi.py --keep-temp
+python update_cliproxyapi.py --update-exe-only
+python update_cliproxyapi.py --github-token github_pat_xxx
+python update_cliproxyapi.py --install-dir /opt/CLIProxyAPI
+```
 
-CLIProxyAPI configuration, authentication, providers, and API functionality remain the responsibility of the upstream project.
+Token priority:
 
-## Tech Stack
+1. `--github-token`
+2. `GITHUB_TOKEN`
+3. `GH_TOKEN`
 
-The project primarily uses:
+## Running with uv
 
-* **PowerShell** for Windows automation and process management
-* **Python** for supporting utilities and logic
-* **uv** for Python dependency and environment management
-* **GitHub Releases API** for retrieving upstream release information
+The Python script can also be run with [`uv`](https://github.com/astral-sh/uv).
 
-## Upstream
+This is useful if you want a simple way to pass environment variables from a `.env` file without manually exporting them first.
 
-This project is built around:
+For example:
 
-[router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)
+```bash
+uv run --env-file .env update_cliproxyapi.py
+```
 
-CLIProxyAPI binaries, releases, and core functionality are maintained by the upstream project.
+Example `.env`:
 
-This repository only provides additional update and management tooling.
+```env
+GITHUB_TOKEN=github_pat_xxx
+```
+
+You can still pass normal script arguments:
+
+```bash
+uv run --env-file .env update_cliproxyapi.py --check-only
+uv run --env-file .env update_cliproxyapi.py --target-version v6.8.35
+uv run --env-file .env update_cliproxyapi.py --install-dir /opt/CLIProxyAPI
+```
+
+Using `uv` is optional. The Python script can still be run directly with Python.
+
+## Behavior notes
+
+* `--check-only` / `-CheckOnly` only reports local and target version information; no install happens.
+* `--dry-run` / `-DryRun` prints the planned action summary without modifying files.
+* A matching version exits successfully unless `--force` / `-Force` is set.
+* A newer local version exits unless `--allow-downgrade` / `-AllowDowngrade` is set.
+* The Python script includes an additional `--update-exe-only` mode that replaces just the binary and leaves the rest of the install directory untouched.
+* The PowerShell script performs a full replacement of the install directory and does not have a binary-only mode.
 
 ## Inspiration
 
@@ -69,8 +107,12 @@ This project takes inspiration from:
 * [CLIProxyAPI-mate](https://github.com/hexbee/CLIProxyAPI-mate)
 * [cliproxyapi-installer](https://github.com/brokechubb/cliproxyapi-installer)
 
-The goal is to provide a smaller, Windows-focused approach using PowerShell and Python.
+Both projects provided useful ideas around simplifying CLIProxyAPI installation, updates, and maintenance.
 
-## Disclaimer
+This repository keeps a narrower scope: small standalone PowerShell and Python scripts focused specifically on release-based updates.
 
-This is an independent community project and is not officially affiliated with or endorsed by CLIProxyAPI or its maintainers.
+## Notes
+
+* This repo does not provide a broader CLI management interface; it is a small GitHub-release updater for the upstream CLIProxyAPI project.
+* `uv` is optional and is mainly useful for convenient Python execution and `.env` loading.
+* The implementation is the source of truth for supported arguments and workflows.
